@@ -37,7 +37,8 @@ def seed_everything(seed: int = 42) -> None:
 
 
 # Data preparation pipeline.
-DATA_PATH = Path("/kaggle/input/aio-2025-linear-forecasting-challenge/FPT_train.csv")
+DATA_PATH = Path("E:/allPythonProject/AIOProject/M06/data/FPT_train.csv")
+OUTPUT_DIR = Path("AIOProject/M06/outputs")
 SEED = 42
 seed_everything(SEED)
 print(f"Device available: {'CUDA' if torch.cuda.is_available() else 'CPU'}")
@@ -436,15 +437,21 @@ def recursive_predict_100_days_v4(
                     pred_val_stochastic = last_close_val - max_change
                 all_sim_paths[sim, i] = pred_val_stochastic
                 next_input_row = sim_input[0, -1, :].clone().unsqueeze(0).unsqueeze(0)
-                next_input_row[0, 0, close_idx] = pred_val_stochastic
+                next_input_row[0, 0, close_idx] = torch.tensor(
+                    pred_val_stochastic, device=device, dtype=next_input_row.dtype
+                )
                 if vol_idx != -1:
                     vol_shock = np.random.normal(0, 0.5)
                     next_vol = mean_vol + vol_shock
-                    next_input_row[0, 0, vol_idx] = next_vol
+                    next_input_row[0, 0, vol_idx] = torch.tensor(
+                        next_vol, device=device, dtype=next_input_row.dtype
+                    )
                 if "daily_return" in feature_cols:
                     ret_idx = feature_cols.index("daily_return")
                     next_ret = pred_val_stochastic - last_close_val
-                    next_input_row[0, 0, ret_idx] = next_ret
+                    next_input_row[0, 0, ret_idx] = torch.tensor(
+                        next_ret, device=device, dtype=next_input_row.dtype
+                    )
                 sim_input = torch.cat([sim_input[:, 1:, :], next_input_row], dim=1)
     mean_forecast = np.mean(all_sim_paths, axis=0)
     upper_bound = np.percentile(all_sim_paths, 90, axis=0)
@@ -499,8 +506,11 @@ def predict_block_recursive(model: nn.Module, initial_input: torch.Tensor, steps
     return np.array(all_predictions)
 
 
-def run_monte_carlo_forecasts(best_models: dict, datasets: dict, feature_cols: list, steps: int = 100, n_simulations: int = 50):
+def run_monte_carlo_forecasts(
+    best_models: dict, datasets: dict, feature_cols: list, steps: int = 100, n_simulations: int = 50, output_dir: Path = OUTPUT_DIR
+):
     """Run Monte Carlo forecasts for each trained model and save CSVs."""
+    output_dir.mkdir(parents=True, exist_ok=True)
     print(f"=== Starting Monte Carlo forecasts for {len(best_models)} models ===")
     for seq_key, model_curr in best_models.items():
         print(f"\n>> Processing model: {seq_key}")
@@ -538,15 +548,18 @@ def run_monte_carlo_forecasts(best_models: dict, datasets: dict, feature_cols: l
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.show()
-        filename = f"submission_{seq_key}_v4.csv"
+        filename = output_dir / f"submission_{seq_key}_v4.csv"
         submission = pd.DataFrame({"id": range(1, steps + 1), "close": pred_price_mean})
         submission.to_csv(filename, index=False)
         print(f"   Saved: {filename}")
     print("\n=== Monte Carlo forecasts complete ===")
 
 
-def run_blockwise_forecasts(best_models: dict, datasets: dict, feature_cols: list, steps: int = 100):
+def run_blockwise_forecasts(
+    best_models: dict, datasets: dict, feature_cols: list, steps: int = 100, output_dir: Path = OUTPUT_DIR
+):
     """Run block-wise forecasts for each trained model and save CSVs/plots."""
+    output_dir.mkdir(parents=True, exist_ok=True)
     print(f"--- Starting block-wise prediction loop for {len(best_models)} models ---")
     for seq_key, model_best in best_models.items():
         print(f"\n>>> Processing model: {seq_key}")
@@ -588,7 +601,7 @@ def run_blockwise_forecasts(best_models: dict, datasets: dict, feature_cols: lis
         plt.savefig(f"forecast_chart_{seq_key}.png")
         plt.show()
         submission = pd.DataFrame({"id": range(1, steps + 1), "close": pred_price_block})
-        filename = f"submission_{seq_key}_blockwise.csv"
+        filename = output_dir / f"submission_{seq_key}_blockwise.csv"
         submission.to_csv(filename, index=False)
         print(f"Saved result file: {filename}")
     print("\n=== All block-wise predictions completed ===")
@@ -600,13 +613,18 @@ def main() -> None:
     if not DATA_PATH.exists():
         print(f"Data file not found at {DATA_PATH}; update DATA_PATH before running.")
         return
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     raw_df = load_data(DATA_PATH)
     df_processed = process_data_with_features_lite(raw_df)
     plot_correlations(df_processed)
     datasets = create_datasets(df_processed, SEQ_LENGTHS, PRED_LEN, TARGET_COLS, FEATURE_COLS)
-    best_models, _ = train_with_rolling_window(datasets)
-    run_monte_carlo_forecasts(best_models, datasets, FEATURE_COLS, steps=PRED_LEN, n_simulations=50)
-    run_blockwise_forecasts(best_models, datasets, FEATURE_COLS, steps=PRED_LEN)
+    best_models_all, cv_results = train_with_rolling_window(datasets)
+    best_seq_key = min(cv_results, key=cv_results.get)
+    print(f"\n>>> Selected best sequence length: {best_seq_key} (val loss {cv_results[best_seq_key]:.4f})")
+    best_models = {best_seq_key: best_models_all[best_seq_key]}
+    best_datasets = {best_seq_key: datasets[best_seq_key]}
+    run_monte_carlo_forecasts(best_models, best_datasets, FEATURE_COLS, steps=PRED_LEN, n_simulations=50, output_dir=OUTPUT_DIR)
+    run_blockwise_forecasts(best_models, best_datasets, FEATURE_COLS, steps=PRED_LEN, output_dir=OUTPUT_DIR)
 
 
 if __name__ == "__main__":
