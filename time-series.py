@@ -503,7 +503,13 @@ def predict_block_recursive(model: nn.Module, initial_input: torch.Tensor, steps
 
 
 def run_monte_carlo_forecasts(
-    best_models: dict, datasets: dict, feature_cols: list, steps: int = 100, n_simulations: int = 50, output_dir: Path = OUTPUT_DIR
+    best_models: dict,
+    datasets: dict,
+    feature_cols: list,
+    steps: int = 100,
+    n_simulations: int = 50,
+    output_dir: Path = OUTPUT_DIR,
+    single_output_path: Path | None = None,
 ):
     """Run Monte Carlo forecasts for each trained model and save CSVs."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -528,7 +534,7 @@ def run_monte_carlo_forecasts(
         pred_price_mean = np.exp(forecast_log_mean)
         pred_price_upper = np.exp(forecast_log_upper)
         pred_price_lower = np.exp(forecast_log_lower)
-        filename = output_dir / f"submission_{seq_key}_v4.csv"
+        filename = single_output_path if single_output_path is not None else output_dir / f"submission_{seq_key}_v4.csv"
         submission = pd.DataFrame({"id": range(1, steps + 1), "close": pred_price_mean})
         submission.to_csv(filename, index=False)
         print(f"   Saved: {filename}")
@@ -580,10 +586,7 @@ def run_blockwise_forecasts(
         plt.grid(True, alpha=0.3)
         plt.savefig(output_dir / f"forecast_chart_{seq_key}.png")
         plt.show()
-        submission = pd.DataFrame({"id": range(1, steps + 1), "close": pred_price_block})
-        filename = output_dir / f"submission_{seq_key}_blockwise.csv"
-        submission.to_csv(filename, index=False)
-        print(f"Saved result file: {filename}")
+        print(f"Saved forecast chart: {output_dir / ('forecast_chart_' + seq_key + '.png')}")
     print("\n=== All block-wise predictions completed ===")
 
 
@@ -602,7 +605,16 @@ def main() -> None:
     print(f"\n>>> Selected best sequence length: {best_seq_key} (val loss {cv_results[best_seq_key]:.4f})")
     best_models = {best_seq_key: best_models_all[best_seq_key]}
     best_datasets = {best_seq_key: datasets[best_seq_key]}
-    run_monte_carlo_forecasts(best_models, best_datasets, FEATURE_COLS, steps=PRED_LEN, n_simulations=50, output_dir=OUTPUT_DIR)
+    best_csv = OUTPUT_DIR / "best_submission.csv"
+    run_monte_carlo_forecasts(
+        best_models,
+        best_datasets,
+        FEATURE_COLS,
+        steps=PRED_LEN,
+        n_simulations=50,
+        output_dir=OUTPUT_DIR,
+        single_output_path=best_csv,
+    )
     run_blockwise_forecasts(best_models, best_datasets, FEATURE_COLS, steps=PRED_LEN, output_dir=OUTPUT_DIR)
 
 
