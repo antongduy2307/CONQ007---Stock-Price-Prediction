@@ -77,10 +77,6 @@ def plot_correlations(df_processed: pd.DataFrame) -> pd.DataFrame:
     corr_matrix = df_processed[features].corr()
     print("--- Correlation with close_log ---")
     print(corr_matrix["close_log"].sort_values(ascending=False))
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5)
-    plt.title("Feature Correlation Matrix")
-    plt.show()
     return corr_matrix
 
 
@@ -532,22 +528,6 @@ def run_monte_carlo_forecasts(
         pred_price_mean = np.exp(forecast_log_mean)
         pred_price_upper = np.exp(forecast_log_upper)
         pred_price_lower = np.exp(forecast_log_lower)
-        plt.figure(figsize=(15, 7))
-        history_len = 150
-        close_col_idx = feature_cols.index("close_log")
-        full_history_log = dataset_curr.feature_data[:, close_col_idx]
-        full_history_price = np.exp(full_history_log)
-        history_index = range(len(full_history_price) - history_len, len(full_history_price))
-        future_index = range(len(full_history_price), len(full_history_price) + steps)
-        plt.plot(history_index, full_history_price[-history_len:], label=f"History ({seq_key})", color="blue", linewidth=2)
-        plt.plot(future_index, pred_price_mean, label="Forecast Mean", color="red", linewidth=2)
-        plt.fill_between(future_index, pred_price_lower, pred_price_upper, color="red", alpha=0.15, label="90% Confidence")
-        plt.title(f"Prediction: Model {seq_key} (Monte Carlo)")
-        plt.xlabel("Time Steps")
-        plt.ylabel("Price (VND)")
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        plt.show()
         filename = output_dir / f"submission_{seq_key}_v4.csv"
         submission = pd.DataFrame({"id": range(1, steps + 1), "close": pred_price_mean})
         submission.to_csv(filename, index=False)
@@ -598,7 +578,7 @@ def run_blockwise_forecasts(
         plt.ylabel("Price (VND)")
         plt.legend()
         plt.grid(True, alpha=0.3)
-        plt.savefig(f"forecast_chart_{seq_key}.png")
+        plt.savefig(output_dir / f"forecast_chart_{seq_key}.png")
         plt.show()
         submission = pd.DataFrame({"id": range(1, steps + 1), "close": pred_price_block})
         filename = output_dir / f"submission_{seq_key}_blockwise.csv"
@@ -616,7 +596,6 @@ def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     raw_df = load_data(DATA_PATH)
     df_processed = process_data_with_features_lite(raw_df)
-    plot_correlations(df_processed)
     datasets = create_datasets(df_processed, SEQ_LENGTHS, PRED_LEN, TARGET_COLS, FEATURE_COLS)
     best_models_all, cv_results = train_with_rolling_window(datasets)
     best_seq_key = min(cv_results, key=cv_results.get)
