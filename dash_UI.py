@@ -71,7 +71,7 @@ def create_chart(df_hist, df_pred):
 
         fig.add_trace(go.Scatter(
             x=line_data['Date'], y=line_data['Close'],
-            mode='lines+markers', name='Dự đoán AI',
+            mode='lines+markers', name='Dự đoán',
             line=dict(color='#00e5ff', width=2), marker=dict(size=3)
         ))
         
@@ -115,7 +115,6 @@ app.layout = dbc.Container([
 
         # Nút Train Model
         dbc.Col([
-            html.Label("Hệ thống:", className="fw-bold text-warning"),
             html.Div([
                 dbc.Button("TRAIN MODEL", id="btn-train", color="danger", className="w-100 fw-bold"),
             ]),
