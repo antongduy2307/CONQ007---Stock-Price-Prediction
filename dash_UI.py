@@ -15,8 +15,8 @@ cache = diskcache.Cache("./cache_directory")
 background_callback_manager = DiskcacheManager(cache)
 
 # Cấu hình đường dẫn file
-FILE_PATH_HISTORY = 'E:/allPythonProject/AIOProject/M06/data/FPT_train.csv' # Đường dẫn input
-FILE_PATH_PREDICTION = 'E:/allPythonProject/AIOProject/M06/outputs/best_submission.csv' # Đường dẫn output 
+FILE_PATH_HISTORY = '' # Đường dẫn input
+FILE_PATH_PREDICTION = '' # Đường dẫn output 
 
 
 # 2. XỬ LÝ DỮ LIỆU & VẼ BIỂU ĐỒ (Giữ nguyên logic cũ)

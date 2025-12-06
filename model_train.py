@@ -37,8 +37,8 @@ def seed_everything(seed: int = 42) -> None:
 
 
 # Data preparation pipeline.
-DATA_PATH = Path("E:/allPythonProject/AIOProject/M06/data/FPT_train.csv")
-OUTPUT_DIR = Path("AIOProject/M06/outputs")
+DATA_PATH = Path("") # Đường dẫn input
+OUTPUT_DIR = Path("") # Đường dẫn output
 SEED = 42
 seed_everything(SEED)
 print(f"Device available: {'CUDA' if torch.cuda.is_available() else 'CPU'}")
