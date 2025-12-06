@@ -111,19 +111,23 @@ app.layout = dbc.Container([
         
         dbc.Col([
             html.H2("CONQ007 - Stock Price Prediction", className="text-center mt-4 text-white"),
-        ], width=6),
+        ], width=5), # Giảm width từ 6 xuống 5 để nhường chỗ cho nút Clear
 
-        # Nút Train Model
+        # Khu vực nút bấm (Train + Clear)
         dbc.Col([
-            html.Div([
-                dbc.Button("TRAIN MODEL", id="btn-train", color="danger", className="w-100 fw-bold"),
+            dbc.Row([
+                # Nút Train
+                dbc.Col(dbc.Button("TRAIN MODEL", id="btn-train", color="danger", className="w-100 fw-bold"), width=8),
+                # Nút Clear (Mới)
+                dbc.Col(dbc.Button("CLEAR", id="btn-clear", color="secondary", className="w-100 fw-bold"), width=4),
             ]),
+            
             # Thanh tiến trình (Progress Bar)
             html.Div([
                 dbc.Progress(id="train-progress", value=0, striped=True, animated=True, className="mt-2", style={"height": "20px", "display": "none"}),
                 html.Div(id="train-status", className="text-muted small mt-1 text-center")
             ])
-        ], width=4, className="mt-4"),
+        ], width=5, className="mt-4"), # Tăng width từ 4 lên 5
     ]),
 
     # --- ERROR MESSAGE ---
@@ -147,9 +151,10 @@ app.layout = dbc.Container([
     inputs=Input("btn-train", "n_clicks"),
     background=True,
     running=[
-        (Output("btn-train", "disabled"), True, False), # Disable nút khi đang chạy
-        (Output("train-progress", "style"), {"display": "flex"}, {"display": "none"}), # Hiện progress bar
-        (Output("train-progress", "value"), 100, 0), # Giả lập chạy full thanh (indeterminate)
+        (Output("btn-train", "disabled"), True, False), # Disable nút Train khi đang chạy
+        (Output("btn-clear", "disabled"), True, False), # Disable nút Clear khi đang chạy
+        (Output("train-progress", "style"), {"display": "flex"}, {"display": "none"}), 
+        (Output("train-progress", "value"), 100, 0), 
     ],
     prevent_initial_call=True
 )
@@ -161,7 +166,6 @@ def run_training_process(n_clicks):
     start_time = time.time()
     try:
         # GỌI HÀM MAIN() TỪ FILE MODEL CỦA BẠN
-        # Quá trình này sẽ mất nhiều thời gian
         print(">>> UI: Bắt đầu gọi lệnh Train...")
         model_train.main() 
         
@@ -171,20 +175,38 @@ def run_training_process(n_clicks):
         return f"Lỗi khi train: {str(e)}"
 
 
-# 5. CALLBACK CẬP NHẬT BIỂU ĐỒ (KHI TRAIN XONG HOẶC ĐỔI MÃ)
-
+# 5. CALLBACK CẬP NHẬT BIỂU ĐỒ (KHI TRAIN XONG, ĐỔI MÃ, HOẶC BẤM CLEAR)
 @app.callback(
     [Output('main-chart', 'figure'), Output('error-msg', 'children')],
-    [Input('ticker', 'value'), Input('train-status', 'children')] # Lắng nghe cả khi Train xong
+    [Input('ticker', 'value'), Input('train-status', 'children'), Input('btn-clear', 'n_clicks')]
 )
-def update_chart(ticker, train_status):
+def update_chart(ticker, train_status, btn_clear):
+    # Xác định nút nào vừa được bấm
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        trigger_id = 'No triggers'
+    else:
+        trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # TRƯỜNG HỢP BẤM CLEAR
+    if trigger_id == 'btn-clear':
+        empty = go.Figure()
+        empty.update_layout(
+            template='plotly_dark', 
+            title="Dữ liệu đã được xóa",
+            xaxis={"visible": False}, 
+            yaxis={"visible": False}
+        )
+        return empty, "Đã xóa dữ liệu."
+
+    # TRƯỜNG HỢP LOAD DỮ LIỆU BÌNH THƯỜNG
     # Check mã
     if not ticker or ticker.upper().strip() != 'FPT':
         empty = go.Figure()
         empty.update_layout(template='plotly_dark', title="Không có dữ liệu")
         return empty, "Hiện tại chỉ hỗ trợ mã FPT"
 
-    # Load lại dữ liệu (Mỗi khi train xong, hàm này chạy lại sẽ đọc file csv mới nhất)
+    # Load lại dữ liệu
     df_h, df_p, err_msg = load_data_strict()
     
     if err_msg:
