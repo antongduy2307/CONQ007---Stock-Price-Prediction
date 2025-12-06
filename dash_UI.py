@@ -83,8 +83,10 @@ def create_chart(df_hist, df_pred):
         rangebreaks=[dict(bounds=["sat", "mon"])],
         rangeselector=dict(
             buttons=list([
+                dict(count=14, label="14D", step="day", stepmode="backward"),
                 dict(count=1, label="1M", step="month", stepmode="backward"),
                 dict(count=3, label="3M", step="month", stepmode="backward"),
+                dict(count=1, label="1Y", step="year", stepmode="backward"),
                 dict(step="all", label="All")
             ]),
             bgcolor="#333", font=dict(color="white"), activecolor="#00e5ff", y=1.05
@@ -129,6 +131,27 @@ app.layout = dbc.Container([
             ])
         ], width=5, className="mt-4"), # Tăng width từ 4 lên 5
     ]),
+
+    dbc.Row([
+        dbc.Col(html.Label("Độ dài Dự đoán (Ngày):", className="text-warning fw-bold"), width=12),
+        dbc.Col([
+            dcc.RadioItems(
+                id='pred-length-selector',
+                options=[
+                    {'label': '5 Ngày', 'value': 5},
+                    {'label': '15 Ngày', 'value': 15},
+                    {'label': '25 Ngày', 'value': 25},
+                    {'label': '50 Ngày', 'value': 50},
+                    {'label': '75 Ngày', 'value': 75},
+                    {'label': '100 Ngày (Max)', 'value': 100}
+                ],
+                value=100,  # Mặc định hiển thị 100 ngày
+                inline=True,
+                className="mt-1",
+                labelStyle={'paddingRight': '15px', 'color': 'white'}
+            )
+        ], width=12),
+    ], className="mb-4"),
 
     # --- ERROR MESSAGE ---
     dbc.Row(dbc.Col(html.Div(id="error-msg", className="text-danger fw-bold text-center mt-2"), width=12)),
@@ -180,7 +203,7 @@ def run_training_process(n_clicks):
     [Output('main-chart', 'figure'), Output('error-msg', 'children')],
     [Input('ticker', 'value'), Input('train-status', 'children'), Input('btn-clear', 'n_clicks')]
 )
-def update_chart(ticker, train_status, btn_clear):
+def update_chart(ticker, train_status, btn_clear, selected_pred_length):
     # Xác định nút nào vừa được bấm
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -214,7 +237,16 @@ def update_chart(ticker, train_status, btn_clear):
         empty.update_layout(template='plotly_dark', title="NO DATA")
         return empty, err_msg
     
-    return create_chart(df_h, df_p), ""
+    if selected_pred_length and not df_p.empty:
+        # Lấy số ngày dự đoán mong muốn
+        N = int(selected_pred_length) 
+        
+        # Cắt DataFrame dự đoán theo số ngày N
+        df_p_sliced = df_p.head(N).copy() 
+    else:
+        df_p_sliced = df_p.copy()
+    
+    return create_chart(df_h, df_p_sliced), ""
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -4,3 +4,5 @@ dist/
 time-series.ipynb
 outputs/
 __pycache__/
+package-lock.json
+package.json
